@@ -55,20 +55,20 @@ impl ComponentData {
 
 /// An unknown component id in the standardized range (0x0000-0x7fff)
 #[repr(transparent)]
-pub struct UnknownComponentId(u16);
+pub struct UnknownComponentId(ComponentId);
 
 impl UnknownComponentId {
     /// Creates a new [`UnknownComponentId`]. Only returns [`Some`] if it is not covered by any of the
     /// specified ranges.
-    pub fn new(id: u16) -> Option<Self> {
-        let is_grease = (id & 0x0f0f == 0x0a0a) && (id & 0xff == (id >> 8)) && id != 0xfefe;
-        (!is_grease && matches!(id, ..0x8000)).then_some(Self(id))
+    pub fn new(id: ComponentId) -> Option<Self> {
+        let is_grease = (id & 0x0f0f == 0x0a0a) && (id & 0xff == (id >> 8)) && id != 0xfafa;
+        (!is_grease && id < 0x8000).then_some(Self(id))
     }
 }
 
 /// A component id from the private range (0x8000-0xffff)
 #[repr(transparent)]
-pub struct PrivateComponentId(u16);
+pub struct PrivateComponentId(ComponentId);
 
 impl PrivateComponentId {
     /// Creates a new [`PrivateComponentId`]. Only returns [`Some`] if it is in the range specified
@@ -197,6 +197,54 @@ impl From<ComponentType> for ComponentId {
             ComponentType::Unknown(UnknownComponentId(id)) => id,
             ComponentType::Private(PrivateComponentId(id)) => id,
         }
+    }
+}
+
+/// A list of [`ComponentId`]s.
+///
+/// Used as the body of the `safe_aad` component in the `app_data_dictionary`
+/// extension. When present in a LeafNode it lists supported components. When
+/// present in the GroupContext it lists components whose Safe AAD must be
+/// understood by the entire group.
+///
+/// ```tls
+/// struct {
+///     ComponentID component_ids<V>;
+/// } ComponentsList;
+/// ```
+#[cfg(feature = "extensions-draft-08")]
+#[derive(
+    PartialEq,
+    Eq,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    TlsSerialize,
+    TlsDeserialize,
+    TlsDeserializeBytes,
+    TlsSize,
+)]
+pub struct ComponentsList {
+    component_ids: Vec<ComponentId>,
+}
+
+#[cfg(feature = "extensions-draft-08")]
+impl ComponentsList {
+    /// Create a new [`ComponentsList`] from a vector of [`ComponentId`]s.
+    pub fn new(component_ids: Vec<ComponentId>) -> Self {
+        Self { component_ids }
+    }
+
+    /// Access the underlying ids.
+    pub fn ids(&self) -> &[ComponentId] {
+        &self.component_ids
+    }
+
+    /// Consume self and return the ids.
+    pub fn into_ids(self) -> Vec<ComponentId> {
+        self.component_ids
     }
 }
 

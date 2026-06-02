@@ -408,7 +408,6 @@ impl ProcessedWelcome {
             log::error!("Confirmation tag mismatch");
             log_crypto!(trace, "  Got:      {:x?}", confirmation_tag);
             log_crypto!(trace, "  Expected: {:x?}", public_group.confirmation_tag());
-            debug_assert!(false, "Confirmation tag mismatch");
 
             // in some tests we need to be able to proceed despite the tag being wrong,
             // e.g. to test whether a later validation check is performed correctly.
@@ -562,6 +561,8 @@ impl StagedWelcome {
             mls_group_config: self.mls_group_config,
             own_leaf_nodes: vec![],
             aad: vec![],
+            #[cfg(feature = "extensions-draft-08")]
+            safe_aad: crate::framing::SafeAad::empty(),
             group_state: MlsGroupState::Operational,
             public_group: self.public_group,
             group_epoch_secrets: self.group_epoch_secrets,
