@@ -221,6 +221,11 @@ impl GroupInfo {
             signature: self.signature,
         }
     }
+
+    /// Returns the signer of the group info.
+    pub fn signer(&self) -> &LeafNodeIndex {
+        &self.payload.signer
+    }
 }
 
 /// GroupInfo (To Be Signed)
