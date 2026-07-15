@@ -471,6 +471,20 @@ impl DerivationInfo {
 )]
 pub struct EpochId(VLBytes);
 
+impl EpochId {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes.into())
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0.into()
+    }
+}
+
 /// Wire struct a virtual client hands to a sibling so the sibling can fetch
 /// and process the matching KeyPackage (mls-virtual-clients draft):
 ///
