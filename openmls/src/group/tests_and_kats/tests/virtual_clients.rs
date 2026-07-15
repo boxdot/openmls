@@ -14,15 +14,15 @@ use crate::{
     key_packages::KeyPackage,
     messages::PathSecret,
     prelude::{Capabilities, LeafNode},
+    treesync::LeafNodeParameters,
 };
 
 /// Emulation group suite. Its KDF hash (SHA-384) differs from the
-/// higher-level group's (SHA-256), so a derivation that skips the import into
-/// the target ciphersuite, or imports under the wrong one, silently produces
-/// different bytes rather than erroring out -- which is exactly what these
-/// tests detect.
+/// higher-level group's (SHA-256) which helps to detect errors like
+/// mismatched KDF hash lengths.
 const EMULATION_CIPHERSUITE: Ciphersuite =
     Ciphersuite::MLS_128_MLKEM768X25519_AES256GCM_SHA384_Ed25519;
+
 /// Higher-level group suite: the target ciphersuite of the derivations under
 /// test.
 const GROUP_CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
@@ -260,5 +260,53 @@ fn vc_group_creation_leaf_key_imports_into_group_ciphersuite() {
         expected_leaf_keypair.public_key(),
         "the creator leaf's encryption key secret must derive from the \
          per-KeyPackage seed imported into the created group's ciphersuite"
+    );
+}
+
+#[openmls_test::openmls_test]
+fn register_vc_emulation_epoch_is_idempotent_per_epoch() {
+    let provider = &Provider::default();
+    let (credential, signer) = new_credential(
+        provider,
+        b"Emulator",
+        EMULATION_CIPHERSUITE.signature_algorithm(),
+    );
+    let mut emulator_group = MlsGroup::new(
+        provider,
+        &signer,
+        &vc_group_config(EMULATION_CIPHERSUITE),
+        credential,
+    )
+    .expect("create emulation group");
+
+    let epoch_id = emulator_group
+        .register_vc_emulation_epoch(provider.crypto(), provider.storage())
+        .expect("first registration");
+
+    let epoch_id_again = emulator_group
+        .register_vc_emulation_epoch(provider.crypto(), provider.storage())
+        .expect("repeated registration in the same epoch");
+    assert_eq!(
+        epoch_id, epoch_id_again,
+        "a repeated registration in the same epoch must return the recorded \
+         epoch id"
+    );
+
+    // Advancing the group epoch installs a fresh exporter, so a new
+    // registration derives a new emulation epoch.
+    emulator_group
+        .self_update(provider, &signer, LeafNodeParameters::default())
+        .expect("self update");
+    emulator_group
+        .merge_pending_commit(provider)
+        .expect("merge self update");
+
+    let next_epoch_id = emulator_group
+        .register_vc_emulation_epoch(provider.crypto(), provider.storage())
+        .expect("registration in the next epoch");
+    assert_ne!(
+        epoch_id, next_epoch_id,
+        "a registration after the epoch advanced must derive a fresh \
+         emulation epoch"
     );
 }
