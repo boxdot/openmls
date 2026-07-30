@@ -9,10 +9,10 @@ use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::{crypto::OpenMlsCrypto, OpenMlsProvider};
 
-fn criterion_key_package(c: &mut Criterion, provider: &impl OpenMlsProvider) {
+fn criterion_key_package(c: &mut Criterion, provider_name: &str, provider: &impl OpenMlsProvider) {
     for &ciphersuite in provider.crypto().supported_ciphersuites().iter() {
         c.bench_function(
-            &format!("KeyPackage create bundle with ciphersuite: {ciphersuite:?}"),
+            &format!("{provider_name}: KeyPackage create bundle with ciphersuite: {ciphersuite:?}"),
             move |b| {
                 b.iter_with_setup(
                     || {
@@ -37,10 +37,10 @@ fn criterion_key_package(c: &mut Criterion, provider: &impl OpenMlsProvider) {
     }
 }
 
-fn create_welcome(c: &mut Criterion, provider: &impl OpenMlsProvider) {
+fn create_welcome(c: &mut Criterion, provider_name: &str, provider: &impl OpenMlsProvider) {
     for &ciphersuite in provider.crypto().supported_ciphersuites().iter() {
         c.bench_function(
-            &format!("Create a welcome message with ciphersuite: {ciphersuite:?}"),
+            &format!("{provider_name}: Create a welcome message with ciphersuite: {ciphersuite:?}"),
             move |b| {
                 b.iter_with_setup(
                     || {
@@ -100,10 +100,10 @@ fn create_welcome(c: &mut Criterion, provider: &impl OpenMlsProvider) {
     }
 }
 
-fn join_group(c: &mut Criterion, provider: &impl OpenMlsProvider) {
+fn join_group(c: &mut Criterion, provider_name: &str, provider: &impl OpenMlsProvider) {
     for &ciphersuite in provider.crypto().supported_ciphersuites().iter() {
         c.bench_function(
-            &format!("Join a group with ciphersuite: {ciphersuite:?}"),
+            &format!("{provider_name}: Join a group with ciphersuite: {ciphersuite:?}"),
             move |b| {
                 b.iter_with_setup(
                     || {
@@ -185,10 +185,10 @@ fn join_group(c: &mut Criterion, provider: &impl OpenMlsProvider) {
     }
 }
 
-fn create_commit(c: &mut Criterion, provider: &impl OpenMlsProvider) {
+fn create_commit(c: &mut Criterion, provider_name: &str, provider: &impl OpenMlsProvider) {
     for &ciphersuite in provider.crypto().supported_ciphersuites().iter() {
         c.bench_function(
-            &format!("Create a commit with ciphersuite: {ciphersuite:?}"),
+            &format!("{provider_name}: Create a commit with ciphersuite: {ciphersuite:?}"),
             move |b| {
                 b.iter_with_setup(
                     || {
@@ -278,18 +278,22 @@ fn create_commit(c: &mut Criterion, provider: &impl OpenMlsProvider) {
     }
 }
 
-fn kp_bundle_rust_crypto(c: &mut Criterion) {
-    let provider = &OpenMlsRustCrypto::default();
-    println!("provider: RustCrypto");
-    criterion_key_package(c, provider);
+/// Runs the whole suite against one provider. Every benchmark ID is prefixed
+/// with `provider_name`, so providers that support the same ciphersuite do not
+/// collide in criterion's output.
+fn bench_provider(c: &mut Criterion, provider_name: &str, provider: &impl OpenMlsProvider) {
+    println!("provider: {provider_name}");
+    criterion_key_package(c, provider_name, provider);
+    create_welcome(c, provider_name, provider);
+    join_group(c, provider_name, provider);
+    create_commit(c, provider_name, provider);
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    kp_bundle_rust_crypto(c);
-    criterion_key_package(c, &openmls_libcrux_crypto::Provider::default());
-    create_welcome(c, &openmls_libcrux_crypto::Provider::default());
-    join_group(c, &openmls_libcrux_crypto::Provider::default());
-    create_commit(c, &openmls_libcrux_crypto::Provider::default());
+    bench_provider(c, "RustCrypto", &OpenMlsRustCrypto::default());
+
+    #[cfg(feature = "libcrux-provider")]
+    bench_provider(c, "libcrux", &openmls_libcrux_crypto::Provider::default());
 }
 
 criterion_group!(benches, criterion_benchmark);
