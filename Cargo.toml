@@ -22,6 +22,11 @@ resolver = "2"
 [workspace.package]
 rust-version = "1.91.0"
 
+# Line-level debug info so dhat (`cargo bench --bench alloc -- --save`) can
+# attribute allocations to inlined frames. No effect on runtime performance.
+[profile.bench]
+debug = 1
+
 # Central dependency management for some crates
 [workspace.dependencies]
 tls_codec = { version = "0.5", features = ["derive", "serde", "mls"] }

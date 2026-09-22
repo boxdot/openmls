@@ -165,6 +165,8 @@ criterion = { version = "^0.8", default-features = false, features = [
     "plotters",
     "html_reports",
 ] }
+# Heap profiler behind `benches/alloc.rs`.
+dhat = "0.3"
 hex = { version = "0.4", features = ["serde"] }
 openmls_traits = { workspace = true, features = ["test-utils"] }
 pretty_env_logger = "0.5"
@@ -186,6 +188,11 @@ web-time = "1.1"
 
 [[bench]]
 name = "benchmark"
+harness = false
+
+# Allocation baseline, prints a table instead of timings.
+[[bench]]
+name = "alloc"
 harness = false
 
 [package.metadata.docs.rs]
