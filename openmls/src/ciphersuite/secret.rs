@@ -146,14 +146,13 @@ impl Secret {
         context: &[u8],
         length: usize,
     ) -> Result<Secret, CryptoError> {
-        let full_label = format!("MLS 1.0 {label}");
         log::trace!(
-            "KDF expand with label \"{}\" and {:?} with context {:x?}",
-            full_label,
+            "KDF expand with label \"{LABEL_PREFIX} {}\" and {:?} with context {:x?}",
+            label,
             ciphersuite,
             context
         );
-        let info = KdfLabel::serialized_label(context, full_label, length)?;
+        let info = KdfLabel::serialized_label(context, label, length)?;
         log::trace!("  serialized info: {info:x?}");
         log_crypto!(trace, "  secret: {:x?}", self.value);
         self.hkdf_expand(crypto, ciphersuite, &info, length)
