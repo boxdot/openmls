@@ -1,5 +1,4 @@
 use openmls_traits::{crypto::OpenMlsCrypto, random::OpenMlsRand, types::Ciphersuite};
-use std::io::Write;
 use tls_codec::{Serialize, Size, TlsSerialize, TlsSize};
 
 use super::mls_auth_content::AuthenticatedContent;
@@ -373,21 +372,19 @@ impl PrivateMessage {
         };
 
         // Persist all initial fields manually (avoids cloning them)
-        let buffer = &mut Vec::with_capacity(plaintext_length + padding_length);
+        let mut buffer = Vec::with_capacity(plaintext_length + padding_length);
 
         // The `content` field is serialized without the `content_type`, which
         // is not part of the struct as per MLS spec.
         authenticated_content
             .content()
-            .serialize_without_type(buffer)?;
-        authenticated_content.auth.tls_serialize(buffer)?;
+            .serialize_without_type(&mut buffer)?;
+        authenticated_content.auth.tls_serialize(&mut buffer)?;
         // Note: The `tls_codec::Serialize` implementation for `&[u8]` prepends the length.
-        // We do not want this here and thus use the "raw" `write_all` method.
-        buffer
-            .write_all(&vec![0u8; padding_length])
-            .map_err(|_| Error::EncodingError("Failed to write padding.".into()))?;
+        // We do not want this here and thus resize the buffer to fill the padding with 0.
+        buffer.resize(buffer.len() + padding_length, 0);
 
-        Ok(buffer.to_vec())
+        Ok(buffer)
     }
 
     /// Get the cipher text bytes as slice.
