@@ -18,7 +18,7 @@ use super::*;
 #[derive(Debug, TlsSerialize, TlsSize)]
 pub(in crate::ciphersuite) struct KdfLabel<'a> {
     length: u16,
-    label: PrefixedLabel<'a>,
+    label: PrefixedLabel<'a, str>,
     context: VLByteSlice<'a>,
 }
 
@@ -50,13 +50,40 @@ impl KdfLabel<'_> {
     }
 }
 
+/// The body of a [`PrefixedLabel`], i.e. what follows `"MLS 1.0 "`.
+pub(in crate::ciphersuite) trait LabelBody {
+    fn body_len(&self) -> usize;
+    fn write_body<W: Write>(&self, writer: &mut W) -> Result<(), tls_codec::Error>;
+}
+
+impl LabelBody for str {
+    fn body_len(&self) -> usize {
+        self.len()
+    }
+
+    fn write_body<W: Write>(&self, writer: &mut W) -> Result<(), tls_codec::Error> {
+        writer.write_all(self.as_bytes()).map_err(Into::into)
+    }
+}
+
+#[cfg(feature = "extensions-draft")]
+impl LabelBody for crate::component::ComponentOperationLabel {
+    fn body_len(&self) -> usize {
+        self.tls_serialized_len()
+    }
+
+    fn write_body<W: Write>(&self, writer: &mut W) -> Result<(), tls_codec::Error> {
+        self.tls_serialize(writer).map(drop)
+    }
+}
+
 /// Serializes as the VL vector `"MLS 1.0 " || label`.
 #[derive(Debug)]
-struct PrefixedLabel<'a>(&'a str);
+pub(in crate::ciphersuite) struct PrefixedLabel<'a, T: ?Sized>(pub(in crate::ciphersuite) &'a T);
 
-impl PrefixedLabel<'_> {
+impl<T: LabelBody + ?Sized> PrefixedLabel<'_, T> {
     fn content_len(&self) -> usize {
-        LABEL_PREFIX.len() + self.0.len()
+        LABEL_PREFIX.len() + self.0.body_len()
     }
 
     fn header(&self) -> Result<TlsVarInt, tls_codec::Error> {
@@ -64,18 +91,18 @@ impl PrefixedLabel<'_> {
     }
 }
 
-impl Size for PrefixedLabel<'_> {
+impl<T: LabelBody + ?Sized> Size for PrefixedLabel<'_, T> {
     fn tls_serialized_len(&self) -> usize {
         let header = self.header().map(|h| h.tls_serialized_len()).unwrap_or(0);
         header + self.content_len()
     }
 }
 
-impl Serialize for PrefixedLabel<'_> {
+impl<T: LabelBody + ?Sized> Serialize for PrefixedLabel<'_, T> {
     fn tls_serialize<W: Write>(&self, writer: &mut W) -> Result<usize, tls_codec::Error> {
         let header = self.header()?.tls_serialize(writer)?;
         writer.write_all(LABEL_PREFIX.as_bytes())?;
-        writer.write_all(self.0.as_bytes())?;
+        self.0.write_body(writer)?;
         Ok(header + self.content_len())
     }
 }

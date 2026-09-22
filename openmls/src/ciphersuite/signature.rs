@@ -2,6 +2,10 @@
 //!
 //! This module contains structs for creating signature keys, issuing signatures and verifying them.
 
+use tls_codec::VLByteSlice;
+
+use crate::ciphersuite::kdf_label::PrefixedLabel;
+
 use super::{LABEL_PREFIX, *};
 
 /// Signature.
@@ -46,9 +50,29 @@ pub struct SignContent {
 impl SignContent {
     /// Create a new [`SignContent`] from a string label and the content bytes.
     pub fn new(label: &str, content: VLBytes) -> Self {
-        let label_string = LABEL_PREFIX.to_owned() + label;
-        let label = label_string.as_bytes().into();
-        Self { label, content }
+        let mut label_bytes = Vec::with_capacity(LABEL_PREFIX.len() + label.len());
+        label_bytes.extend_from_slice(LABEL_PREFIX.as_bytes());
+        label_bytes.extend_from_slice(label.as_bytes());
+        Self {
+            label: label_bytes.into(),
+            content,
+        }
+    }
+}
+
+/// Same as [`SignContent`] but non-owning the data.
+#[derive(TlsSize, TlsSerialize)]
+pub(in crate::ciphersuite) struct SignContentRef<'a> {
+    pub label: PrefixedLabel<'a, str>,
+    pub content: VLByteSlice<'a>,
+}
+
+impl<'a> SignContentRef<'a> {
+    pub(in crate::ciphersuite) fn new(label: &'a str, content: &'a [u8]) -> Self {
+        Self {
+            label: PrefixedLabel(label),
+            content: VLByteSlice(content),
+        }
     }
 }
 

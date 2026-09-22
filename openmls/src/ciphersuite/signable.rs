@@ -32,7 +32,7 @@ use openmls_traits::{crypto::OpenMlsCrypto, signatures::Signer};
 use thiserror::Error;
 use tls_codec::Serialize;
 
-use crate::ciphersuite::{OpenMlsSignaturePublicKey, SignContent, Signature};
+use crate::ciphersuite::{OpenMlsSignaturePublicKey, SignContentRef, Signature};
 
 /// Signature generation and verification errors.
 /// The only information relayed with this error is whether the signature
@@ -76,7 +76,7 @@ pub trait Signable: Sized {
             .unsigned_payload()
             .map_err(|_| SignatureError::SigningError)?;
         let payload_sign_content =
-            match SignContent::new(self.label(), payload.clone().into()).tls_serialize_detached() {
+            match SignContentRef::new(self.label(), &payload).tls_serialize_detached() {
                 Ok(p) => p,
                 Err(e) => {
                     log::error!("Serializing SignContent failed, {e:?}");
@@ -149,7 +149,7 @@ pub trait Verifiable: Sized {
         let payload = self
             .unsigned_payload()
             .map_err(|_| SignatureError::VerificationError)?;
-        let sign_content = SignContent::new(self.label(), payload.into());
+        let sign_content = SignContentRef::new(self.label(), &payload);
         let payload = match sign_content.tls_serialize_detached() {
             Ok(p) => p,
             Err(e) => {

@@ -39,10 +39,13 @@ use openmls_traits::{
     types::{Ciphersuite, CryptoError, HpkeCiphertext},
 };
 use thiserror::Error;
-use tls_codec::{Serialize, TlsDeserialize, TlsDeserializeBytes, TlsSerialize, TlsSize, VLBytes};
+use tls_codec::{
+    Serialize, TlsDeserialize, TlsDeserializeBytes, TlsSerialize, TlsSize, VLByteSlice, VLBytes,
+};
 
 use super::LABEL_PREFIX;
 
+use crate::ciphersuite::kdf_label::{LabelBody, PrefixedLabel};
 #[cfg(feature = "targeted-messages-draft")]
 use crate::error::LibraryError;
 #[cfg(feature = "targeted-messages-draft")]
@@ -89,34 +92,36 @@ impl EncryptContext {
     /// Create a new [`EncryptContext`] from a string label and the content bytes.
     /// Ensures that the prefix LABEL_PREFIX is prepended to the label.
     pub(crate) fn new(label: &str, context: VLBytes) -> Self {
-        let label_string = LABEL_PREFIX.to_owned() + label;
-        let label = label_string.as_bytes().into();
-        Self { label, context }
-    }
-
-    #[cfg(feature = "extensions-draft")]
-    pub(crate) fn new_from_component_operation_label(
-        label: ComponentOperationLabel,
-        context: VLBytes,
-    ) -> Result<Self, Error> {
-        let serialized_label = label.tls_serialize_detached()?;
-
-        // Prefix the serialized label with the LABEL_PREFIX bytes
-        // Note that the spec isn't precise here. There are different ways to
-        // combine these. https://github.com/mlswg/mls-extensions/issues/79
-        let mut label = LABEL_PREFIX.as_bytes().to_vec();
-        label.extend(serialized_label);
-
-        Ok(Self {
-            label: label.into(),
+        let mut label_bytes = Vec::with_capacity(LABEL_PREFIX.len() + label.len());
+        label_bytes.extend_from_slice(LABEL_PREFIX.as_bytes());
+        label_bytes.extend_from_slice(label.as_bytes());
+        Self {
+            label: label_bytes.into(),
             context,
-        })
+        }
     }
 }
 
 impl From<(&str, &[u8])> for EncryptContext {
     fn from((label, context): (&str, &[u8])) -> Self {
         Self::new(label, context.into())
+    }
+}
+
+/// Same as [`EncryptContext`] but non-owning the data.
+#[derive(Debug, TlsSerialize, TlsSize)]
+struct EncryptContextRef<'a, T: LabelBody + ?Sized> {
+    /// Prefixed with LABEL_PREFIX
+    label: PrefixedLabel<'a, T>,
+    context: VLByteSlice<'a>,
+}
+
+impl<'a, T: LabelBody + ?Sized> EncryptContextRef<'a, T> {
+    pub(crate) fn new(label: &'a T, context: &'a [u8]) -> Self {
+        Self {
+            label: PrefixedLabel(label),
+            context: VLByteSlice(context),
+        }
     }
 }
 
@@ -129,7 +134,7 @@ pub(crate) fn encrypt_with_label(
     ciphersuite: Ciphersuite,
     crypto: &impl OpenMlsCrypto,
 ) -> Result<HpkeCiphertext, Error> {
-    let context: EncryptContext = (label, context).into();
+    let context = EncryptContextRef::new(label, context);
 
     log_crypto!(
         debug,
@@ -141,7 +146,7 @@ pub(crate) fn encrypt_with_label(
 
 fn encrypt_with_label_internal(
     public_key: &[u8],
-    context: EncryptContext,
+    context: impl Serialize,
     plaintext: &[u8],
     ciphersuite: Ciphersuite,
     crypto: &impl OpenMlsCrypto,
@@ -193,12 +198,10 @@ pub fn safe_encrypt_with_label(
 ) -> Result<HpkeCiphertext, Error> {
     let component_operation_label =
         ComponentOperationLabel::new(context.component_id, context.label);
-
-    let context = EncryptContext::new_from_component_operation_label(
-        component_operation_label,
-        context.context.into(),
-    )?;
-
+    // Prefix the serialized label with the LABEL_PREFIX.
+    // Note that the spec isn't precise here. There are different ways to
+    // combine these. https://github.com/mlswg/mls-extensions/issues/79
+    let context = EncryptContextRef::new(&component_operation_label, context.context);
     encrypt_with_label_internal(public_key, context, plaintext, ciphersuite, crypto)
 }
 
@@ -216,14 +219,14 @@ pub(crate) fn decrypt_with_label(
         "HPKE Decrypt with label `{label}` and `ciphersuite` {ciphersuite:?}:"
     );
 
-    let context: EncryptContext = (label, context).into();
+    let context = EncryptContextRef::new(label, context);
 
     decrypt_with_label_internal(private_key, context, ciphertext, ciphersuite, crypto)
 }
 
 fn decrypt_with_label_internal(
     private_key: &[u8],
-    context: EncryptContext,
+    context: impl Serialize,
     ciphertext: &HpkeCiphertext,
     ciphersuite: Ciphersuite,
     crypto: &impl OpenMlsCrypto,
@@ -265,10 +268,7 @@ pub fn safe_decrypt_with_label(
     let component_operation_label =
         ComponentOperationLabel::new(context.component_id, context.label);
 
-    let context: EncryptContext = EncryptContext::new_from_component_operation_label(
-        component_operation_label,
-        context.context.into(),
-    )?;
+    let context = EncryptContextRef::new(&component_operation_label, context.context);
 
     decrypt_with_label_internal(private_key, context, ciphertext, ciphersuite, crypto)
 }
@@ -296,7 +296,7 @@ pub(crate) fn encrypt_with_label_psk_resolved_aad<F>(
 where
     F: FnOnce(&[u8]) -> Result<Vec<u8>, LibraryError>,
 {
-    let info = EncryptContext::new(params.label, params.context.into())
+    let info = EncryptContextRef::new(params.label, params.context)
         .tls_serialize_detached()
         .map_err(LibraryError::missing_bound_check)?;
     crypto
@@ -323,7 +323,7 @@ pub(crate) fn decrypt_with_label_psk_aad(
     ciphertext: &HpkeCiphertext,
     crypto: &impl OpenMlsCrypto,
 ) -> Result<Vec<u8>, Error> {
-    let info = EncryptContext::new(params.label, params.context.into()).tls_serialize_detached()?;
+    let info = EncryptContextRef::new(params.label, params.context).tls_serialize_detached()?;
     let content_bytes = crypto.hpke_open_psk(
         params.ciphersuite.hpke_config(),
         ciphertext,
