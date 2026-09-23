@@ -154,10 +154,11 @@ impl Secret {
             ciphersuite,
             context
         );
-        let info = KdfLabel::serialized_label(context, label, length)?;
-        log::trace!("  serialized info: {info:x?}");
-        log_crypto!(trace, "  secret: {:x?}", self.value);
-        self.hkdf_expand(crypto, ciphersuite, &info, length)
+        KdfLabel::with_serialized_label(context, label, length, |info| {
+            log::trace!("  serialized info: {info:x?}");
+            log_crypto!(trace, "  secret: {:x?}", self.value);
+            self.hkdf_expand(crypto, ciphersuite, info, length)
+        })
     }
 
     /// Derive a new `Secret` from the this one by expanding it with the given

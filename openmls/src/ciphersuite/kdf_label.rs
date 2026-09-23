@@ -22,15 +22,30 @@ pub(in crate::ciphersuite) struct KdfLabel<'a> {
     context: VLByteSlice<'a>,
 }
 
+/// Labels up to this size are serialized on the stack.
+const STACK_LABEL_LEN: usize = 256;
+
 impl KdfLabel<'_> {
     /// Serialize this label.
     /// Returns the serialized label as byte vector or returns a [`CryptoError`]
     /// if the parameters are invalid.
+    #[cfg(test)]
     pub(in crate::ciphersuite) fn serialized_label(
         context: &[u8],
         label: &str,
         length: usize,
     ) -> Result<Vec<u8>, CryptoError> {
+        Self::with_serialized_label(context, label, length, |info| Ok(info.to_vec()))
+    }
+
+    /// Serialize this label and pass it to `f`.
+    /// Returns a [`CryptoError`] if the parameters are invalid.
+    pub(in crate::ciphersuite) fn with_serialized_label<T>(
+        context: &[u8],
+        label: &str,
+        length: usize,
+        f: impl FnOnce(&[u8]) -> Result<T, CryptoError>,
+    ) -> Result<T, CryptoError> {
         if length > u16::MAX as usize {
             debug_assert!(
                 false,
@@ -44,9 +59,19 @@ impl KdfLabel<'_> {
             context: VLByteSlice(context),
         };
         log::trace!("{kdf_label:?}");
-        kdf_label
-            .tls_serialize_detached()
-            .map_err(|_| CryptoError::KdfSerializationError)
+        let len = kdf_label.tls_serialized_len();
+        if len <= STACK_LABEL_LEN {
+            let mut buf = [0u8; STACK_LABEL_LEN];
+            kdf_label
+                .tls_serialize(&mut &mut buf[..len])
+                .map_err(|_| CryptoError::KdfSerializationError)?;
+            f(&buf[..len])
+        } else {
+            let info = kdf_label
+                .tls_serialize_detached()
+                .map_err(|_| CryptoError::KdfSerializationError)?;
+            f(&info)
+        }
     }
 }
 
@@ -151,6 +176,9 @@ mod tests {
         let long_label = "x".repeat(100);
         let long_context = vec![0xab; 200];
         let huge_context = vec![0xcd; 20_000];
+        // Serialized to exactly `STACK_LABEL_LEN` and one byte more.
+        let stack_limit_context = vec![0xef; 238];
+        let heap_context = vec![0xef; 239];
 
         let cases: &[(&[u8], &str, usize)] = &[
             (&[], "", 0),
@@ -159,6 +187,8 @@ mod tests {
             (&long_context, "nonce", 12),
             (&[7; 32], &long_label, 64),
             (&huge_context, &long_label, u16::MAX as usize),
+            (&stack_limit_context, "nonce", 12),
+            (&heap_context, "nonce", 12),
         ];
 
         for &(context, label, length) in cases {
