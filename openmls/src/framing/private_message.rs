@@ -222,7 +222,7 @@ impl PrivateMessage {
         };
         // Serialize the content AAD
         let private_message_content_aad = PrivateContentAad {
-            group_id: header.group_id.clone(),
+            group_id: &header.group_id,
             epoch: header.epoch,
             content_type: public_message.content().content_type(),
             authenticated_data: VLByteSlice(public_message.authenticated_data()),
@@ -298,7 +298,7 @@ impl PrivateMessage {
         // Compute sender data nonce by xoring reuse guard and key schedule
         // nonce as per spec.
         let mls_sender_data_aad = MlsSenderDataAad::new(
-            header.group_id.clone(),
+            &header.group_id,
             header.epoch,
             public_message.content().content_type(),
         );
@@ -329,7 +329,7 @@ impl PrivateMessage {
             )
             .map_err(LibraryError::unexpected_crypto_error)?;
         let private_message = PrivateMessage {
-            group_id: header.group_id.clone(),
+            group_id: header.group_id,
             epoch: header.epoch,
             content_type: public_message.content().content_type(),
             authenticated_data: public_message.authenticated_data().into(),
@@ -396,7 +396,7 @@ impl PrivateMessage {
 
 #[derive(TlsSerialize, TlsSize)]
 pub(crate) struct PrivateContentAad<'a> {
-    pub(crate) group_id: GroupId,
+    pub(crate) group_id: &'a GroupId,
     pub(crate) epoch: GroupEpoch,
     pub(crate) content_type: ContentType,
     pub(crate) authenticated_data: VLByteSlice<'a>,

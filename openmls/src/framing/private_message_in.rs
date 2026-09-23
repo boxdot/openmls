@@ -80,7 +80,7 @@ impl PrivateMessageIn {
             .map_err(LibraryError::unexpected_crypto_error)?;
         // Serialize sender data AAD
         let mls_sender_data_aad =
-            MlsSenderDataAad::new(self.group_id.clone(), self.epoch, self.content_type);
+            MlsSenderDataAad::new(&self.group_id, self.epoch, self.content_type);
         let mls_sender_data_aad_bytes = mls_sender_data_aad
             .tls_serialize_detached()
             .map_err(LibraryError::missing_bound_check)?;
@@ -117,7 +117,7 @@ impl PrivateMessageIn {
     ) -> Result<PrivateMessageContentIn, MessageDecryptionError> {
         // Serialize content AAD
         let private_message_content_aad_bytes = PrivateContentAad {
-            group_id: self.group_id.clone(),
+            group_id: &self.group_id,
             epoch: self.epoch,
             content_type: self.content_type,
             authenticated_data: VLByteSlice(self.authenticated_data.as_slice()),
@@ -162,8 +162,8 @@ impl PrivateMessageIn {
     /// virtual-clients reuse guard to recover the sender's emulation-group
     /// leaf index.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn to_verifiable_content(
-        &self,
+    pub(crate) fn into_verifiable_content(
+        self,
         ciphersuite: Ciphersuite,
         crypto: &impl OpenMlsCrypto,
         message_secrets: &mut MessageSecrets,
@@ -242,10 +242,10 @@ impl PrivateMessageIn {
         let verifiable = VerifiableAuthenticatedContentIn::new(
             WireFormat::PrivateMessage,
             FramedContentIn {
-                group_id: self.group_id.clone(),
+                group_id: self.group_id,
                 epoch: self.epoch,
                 sender,
-                authenticated_data: self.authenticated_data.clone(),
+                authenticated_data: self.authenticated_data,
                 body: private_message_content.content,
             },
             Some(message_secrets.serialized_context().to_vec()),

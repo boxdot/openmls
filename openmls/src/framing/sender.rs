@@ -109,24 +109,19 @@ impl MlsSenderData {
     }
 }
 
-#[derive(Clone, TlsDeserialize, TlsDeserializeBytes, TlsSerialize, TlsSize)]
-pub(crate) struct MlsSenderDataAad {
-    pub(crate) group_id: GroupId,
+#[derive(TlsSerialize, TlsSize)]
+pub(crate) struct MlsSenderDataAad<'a> {
+    pub(crate) group_id: &'a GroupId,
     pub(crate) epoch: GroupEpoch,
     pub(crate) content_type: ContentType,
 }
 
-impl MlsSenderDataAad {
-    pub(crate) fn new(group_id: GroupId, epoch: GroupEpoch, content_type: ContentType) -> Self {
+impl<'a> MlsSenderDataAad<'a> {
+    pub(crate) fn new(group_id: &'a GroupId, epoch: GroupEpoch, content_type: ContentType) -> Self {
         Self {
             group_id,
             epoch,
             content_type,
         }
-    }
-
-    #[cfg(test)]
-    pub fn test_new(group_id: GroupId, epoch: GroupEpoch, content_type: ContentType) -> Self {
-        Self::new(group_id, epoch, content_type)
     }
 }

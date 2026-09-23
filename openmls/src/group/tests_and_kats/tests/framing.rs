@@ -194,7 +194,7 @@ fn bad_padding() {
 
             let private_message_content_aad_bytes = {
                 let private_message_content_aad = PrivateContentAad {
-                    group_id: group_id.clone(),
+                    group_id: &group_id,
                     epoch,
                     content_type: plaintext.content().content_type(),
                     authenticated_data: VLByteSlice(plaintext.authenticated_data()),
@@ -290,11 +290,8 @@ fn bad_padding() {
             // Compute sender data nonce by xoring reuse guard and key schedule
             // nonce as per spec.
 
-            let mls_sender_data_aad = MlsSenderDataAad::test_new(
-                group_id.clone(),
-                epoch,
-                plaintext.content().content_type(),
-            );
+            let mls_sender_data_aad =
+                MlsSenderDataAad::new(&group_id, epoch, plaintext.content().content_type());
             // Serialize the sender data AAD
             let mls_sender_data_aad_bytes = mls_sender_data_aad.tls_serialize_detached().unwrap();
             let sender_data = MlsSenderData::from_sender(leaf_index, generation, reuse_guard);
@@ -326,7 +323,7 @@ fn bad_padding() {
             .sender_data(&message_secrets, provider.crypto(), ciphersuite)
             .expect("Could not decrypt sender data.");
 
-        let verifiable_plaintext_result = tampered_ciphertext.to_verifiable_content(
+        let verifiable_plaintext_result = tampered_ciphertext.into_verifiable_content(
             ciphersuite,
             provider.crypto(),
             &mut message_secrets,

@@ -627,7 +627,7 @@ pub fn run_test_vector(
                 )
                 .expect("Unable to get sender data");
             let mls_plaintext_application: AuthenticatedContentIn = mls_ciphertext_application
-                .to_verifiable_content(
+                .into_verifiable_content(
                     ciphersuite,
                     provider.crypto(),
                     &mut message_secrets,
@@ -706,7 +706,7 @@ pub fn run_test_vector(
                 )
                 .expect("Unable to get sender data");
             let mls_plaintext_handshake: AuthenticatedContentIn = mls_ciphertext_handshake
-                .to_verifiable_content(
+                .into_verifiable_content(
                     ciphersuite,
                     provider.crypto(),
                     group.message_secrets_test_mut(),
@@ -784,7 +784,7 @@ pub fn run_test_vector(
                 )
                 .expect("Unable to get sender data");
             let mls_plaintext_handshake: AuthenticatedContentIn = mls_ciphertext_handshake
-                .to_verifiable_content(
+                .into_verifiable_content(
                     ciphersuite,
                     provider.crypto(),
                     group.message_secrets_test_mut(),

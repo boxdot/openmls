@@ -206,7 +206,7 @@ fn wire_format_checks() {
         .sender_data(&message_secrets, provider.crypto(), ciphersuite)
         .expect("Could not decrypt sender data.");
     let verifiable_plaintext = ciphertext
-        .to_verifiable_content(
+        .into_verifiable_content(
             ciphersuite,
             provider.crypto(),
             &mut message_secrets,
@@ -255,7 +255,7 @@ fn wire_format_checks() {
         .sender_data(&message_secrets, provider.crypto(), ciphersuite)
         .expect("Could not decrypt sender data.");
     let verifiable_plaintext = ciphertext
-        .to_verifiable_content(
+        .into_verifiable_content(
             ciphersuite,
             provider.crypto(),
             &mut message_secrets,

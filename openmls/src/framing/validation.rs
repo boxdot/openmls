@@ -196,7 +196,7 @@ impl DecryptedMessage {
         let message_secrets = group
             .message_secrets_for_epoch_mut(ciphertext.epoch())
             .map_err(|_| MessageDecryptionError::AeadError)?;
-        let decrypt_result = ciphertext.to_verifiable_content(
+        let decrypt_result = ciphertext.into_verifiable_content(
             ciphersuite,
             crypto,
             message_secrets,
