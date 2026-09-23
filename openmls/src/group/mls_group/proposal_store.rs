@@ -733,9 +733,9 @@ pub struct QueuedAddProposal<'a> {
     sender: &'a Sender,
 }
 
-impl QueuedAddProposal<'_> {
+impl<'a> QueuedAddProposal<'a> {
     /// Returns a reference to the proposal
-    pub fn add_proposal(&self) -> &AddProposal {
+    pub fn add_proposal(&self) -> &'a AddProposal {
         self.add_proposal
     }
 
@@ -771,9 +771,9 @@ pub struct QueuedUpdateProposal<'a> {
     sender: &'a Sender,
 }
 
-impl QueuedUpdateProposal<'_> {
+impl<'a> QueuedUpdateProposal<'a> {
     /// Returns a reference to the proposal
-    pub fn update_proposal(&self) -> &UpdateProposal {
+    pub fn update_proposal(&self) -> &'a UpdateProposal {
         self.update_proposal
     }
 

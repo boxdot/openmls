@@ -410,14 +410,14 @@ impl MlsGroup {
 
         // Determine if Commit has a path
         let (commit_secret, new_keypairs, new_leaf_keypair_option, update_path_leaf_node) =
-            if let Some(path) = commit.path.clone() {
+            if let Some(path) = commit.path.as_ref() {
                 // Update the public group
                 // ValSem202: Path must be the right length
                 diff.apply_received_update_path(
                     provider.crypto(),
                     ciphersuite,
                     sender_index,
-                    &path,
+                    path,
                 )?;
 
                 // Update group context
@@ -465,7 +465,7 @@ impl MlsGroup {
                         )?;
                     Some(self.recreate_path_for_own_commit(
                         &diff,
-                        &path,
+                        path,
                         ciphersuite,
                         self.group_id(),
                         provider.crypto(),

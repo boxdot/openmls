@@ -243,6 +243,11 @@ impl AuthenticatedContent {
         &self.content.body
     }
 
+    /// Consume the message and return the content body.
+    pub(crate) fn into_content(self) -> FramedContentBody {
+        self.content.body
+    }
+
     /// Get the wire format.
     pub(crate) fn wire_format(&self) -> WireFormat {
         self.wire_format

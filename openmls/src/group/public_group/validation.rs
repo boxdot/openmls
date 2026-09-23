@@ -19,7 +19,7 @@ use crate::{
         errors::{ExternalCommitValidationError, ProposalValidationError, ValidationError},
         past_secrets::MessageSecretsStore,
         proposal_store::ProposalQueue,
-        GroupContextExtensionsProposalValidationError, Member,
+        GroupContextExtensionsProposalValidationError,
     },
     key_packages::KeyPackage,
     messages::{
@@ -230,19 +230,13 @@ impl PublicGroup {
 
         // Initialize the sets with the current members, filtered by the
         // remove proposals.
-        for Member {
-            index,
-            encryption_key,
-            signature_key,
-            ..
-        } in self.treesync().full_leaf_members()
-        {
+        for (index, leaf_node) in self.treesync().full_leaves() {
             if removed_members.contains(&index) {
                 continue;
             }
-            encryption_key_set.insert(encryption_key);
+            encryption_key_set.insert(leaf_node.encryption_key().as_slice());
             if replaced_leaf != Some(index) {
-                signature_key_set.insert(signature_key);
+                signature_key_set.insert(leaf_node.signature_key().as_slice());
             }
         }
 
@@ -257,9 +251,8 @@ impl PublicGroup {
                     .leaf_node()
                     .signature_key()
                     .as_slice()
-                    .to_vec()
             })
-            .chain(path_leaf_signature_key.map(|signature_key| signature_key.as_slice().to_vec()));
+            .chain(path_leaf_signature_key.map(|signature_key| signature_key.as_slice()));
 
         // Collect encryption keys from add proposals, update proposals, the
         // commit leaf node and path keys
@@ -273,7 +266,6 @@ impl PublicGroup {
                     .encryption_key()
                     .key()
                     .as_slice()
-                    .to_vec()
             })
             .chain(proposal_queue.update_proposals().map(|update_proposal| {
                 update_proposal
@@ -282,13 +274,12 @@ impl PublicGroup {
                     .encryption_key()
                     .key()
                     .as_slice()
-                    .to_vec()
             }))
             .chain(commit.and_then(|commit| {
                 commit
                     .path
                     .as_ref()
-                    .map(|path| path.leaf_node().encryption_key().as_slice().to_vec())
+                    .map(|path| path.leaf_node().encryption_key().as_slice())
             }))
             .chain(
                 commit
@@ -297,21 +288,16 @@ impl PublicGroup {
                         commit.path.as_ref().map(|path| {
                             path.nodes()
                                 .iter()
-                                .map(|node| node.encryption_key().as_slice().to_vec())
+                                .map(|node| node.encryption_key().as_slice())
                         })
                     })
                     .flatten(),
             );
 
         // Collect init keys from add proposals
-        let init_keys = proposal_queue.add_proposals().map(|add_proposal| {
-            add_proposal
-                .add_proposal()
-                .key_package()
-                .hpke_init_key()
-                .as_slice()
-                .to_vec()
-        });
+        let init_keys = proposal_queue
+            .add_proposals()
+            .map(|add_proposal| add_proposal.add_proposal().key_package().hpke_init_key());
 
         // Validate uniqueness of signature keys
         //  - ValSem101
@@ -334,7 +320,7 @@ impl PublicGroup {
         //  - https://validation.openmls.tech/#valn0112
         //  - https://validation.openmls.tech/#valn1209
         for encryption_key in encryption_keys {
-            if init_key_set.contains(&encryption_key) {
+            if init_key_set.contains(encryption_key) {
                 return Err(ProposalValidationError::InitEncryptionKeyCollision);
             }
             if !encryption_key_set.insert(encryption_key) {
@@ -346,10 +332,10 @@ impl PublicGroup {
         //  - ValSem102
         //  - ValSem104
         for init_key in init_keys {
-            if encryption_key_set.contains(&init_key) {
+            if encryption_key_set.contains(&init_key.as_slice()) {
                 return Err(ProposalValidationError::InitEncryptionKeyCollision);
             }
-            if !init_key_set.insert(init_key) {
+            if !init_key_set.insert(init_key.as_slice()) {
                 return Err(ProposalValidationError::DuplicateInitKey);
             }
         }

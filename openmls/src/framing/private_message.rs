@@ -227,7 +227,7 @@ impl PrivateMessage {
             content_type: public_message.content().content_type(),
             authenticated_data: VLByteSlice(public_message.authenticated_data()),
         };
-        let private_message_content_aad_bytes = private_message_content_aad
+        let mut private_message_content_aad_bytes = private_message_content_aad
             .tls_serialize_detached()
             .map_err(LibraryError::missing_bound_check)?;
         // Extract generation and key material for encryption
@@ -303,8 +303,10 @@ impl PrivateMessage {
             public_message.content().content_type(),
         );
         // Serialize the sender data AAD
-        let mls_sender_data_aad_bytes = mls_sender_data_aad
-            .tls_serialize_detached()
+        private_message_content_aad_bytes.clear();
+        let mut mls_sender_data_aad_bytes = private_message_content_aad_bytes;
+        mls_sender_data_aad
+            .tls_serialize(&mut mls_sender_data_aad_bytes)
             .map_err(LibraryError::missing_bound_check)?;
         let sender_data = MlsSenderData::from_sender(
             // XXX: #106 This will fail for messages with a non-member sender.
@@ -318,12 +320,15 @@ impl PrivateMessage {
             "Encryption key for sender data: {sender_data_key:x?}"
         );
         log_crypto!(trace, "Encryption of sender data mls_sender_data_aad_bytes: {mls_sender_data_aad_bytes:x?} - sender_data_nonce: {sender_data_nonce:x?}");
+        let mut sender_data_bytes = [0u8; 12];
+        debug_assert!(sender_data_bytes.len() == sender_data.tls_serialized_len());
+        sender_data
+            .tls_serialize(&mut sender_data_bytes.as_mut_slice())
+            .map_err(LibraryError::missing_bound_check)?;
         let encrypted_sender_data = sender_data_key
             .aead_seal(
                 crypto,
-                &sender_data
-                    .tls_serialize_detached()
-                    .map_err(LibraryError::missing_bound_check)?,
+                &sender_data_bytes,
                 &mls_sender_data_aad_bytes,
                 &sender_data_nonce,
             )

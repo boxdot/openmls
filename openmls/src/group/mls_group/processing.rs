@@ -873,11 +873,14 @@ impl MlsGroup {
         let epoch = content.epoch();
 
         let content = match content.content() {
-            FramedContentBody::Application(application_message) => {
-                ProcessedMessageContent::ApplicationMessage(ApplicationMessage::new(
-                    application_message.as_slice().to_owned(),
-                ))
-            }
+            FramedContentBody::Application(_) => match content.into_content() {
+                FramedContentBody::Application(application_message) => {
+                    ProcessedMessageContent::ApplicationMessage(ApplicationMessage::new(
+                        application_message.as_slice().to_owned(),
+                    ))
+                }
+                _ => unreachable!(),
+            },
             FramedContentBody::Proposal(_) => {
                 let proposal = Box::new(QueuedProposal::from_authenticated_content_by_ref(
                     self.ciphersuite(),

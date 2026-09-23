@@ -218,14 +218,12 @@ impl OpenMlsCrypto for RustCrypto {
                 let aes =
                     Aes128Gcm::new_from_slice(key).map_err(|_| CryptoError::CryptoLibraryError)?;
                 aes.encrypt(nonce.into(), Payload { msg: data, aad })
-                    .map(|r| r.as_slice().into())
                     .map_err(|_| CryptoError::CryptoLibraryError)
             }
             AeadType::Aes256Gcm => {
                 let aes =
                     Aes256Gcm::new_from_slice(key).map_err(|_| CryptoError::CryptoLibraryError)?;
                 aes.encrypt(nonce.into(), Payload { msg: data, aad })
-                    .map(|r| r.as_slice().into())
                     .map_err(|_| CryptoError::CryptoLibraryError)
             }
             AeadType::ChaCha20Poly1305 => {
@@ -233,7 +231,6 @@ impl OpenMlsCrypto for RustCrypto {
                     .map_err(|_| CryptoError::CryptoLibraryError)?;
                 chacha_poly
                     .encrypt(nonce.into(), Payload { msg: data, aad })
-                    .map(|r| r.as_slice().into())
                     .map_err(|_| CryptoError::CryptoLibraryError)
             }
         }
@@ -252,14 +249,12 @@ impl OpenMlsCrypto for RustCrypto {
                 let aes =
                     Aes128Gcm::new_from_slice(key).map_err(|_| CryptoError::CryptoLibraryError)?;
                 aes.decrypt(nonce.into(), Payload { msg: ct_tag, aad })
-                    .map(|r| r.as_slice().into())
                     .map_err(|_| CryptoError::AeadDecryptionError)
             }
             AeadType::Aes256Gcm => {
                 let aes =
                     Aes256Gcm::new_from_slice(key).map_err(|_| CryptoError::CryptoLibraryError)?;
                 aes.decrypt(nonce.into(), Payload { msg: ct_tag, aad })
-                    .map(|r| r.as_slice().into())
                     .map_err(|_| CryptoError::AeadDecryptionError)
             }
             AeadType::ChaCha20Poly1305 => {
@@ -267,7 +262,6 @@ impl OpenMlsCrypto for RustCrypto {
                     .map_err(|_| CryptoError::CryptoLibraryError)?;
                 chacha_poly
                     .decrypt(nonce.into(), Payload { msg: ct_tag, aad })
-                    .map(|r| r.as_slice().into())
                     .map_err(|_| CryptoError::AeadDecryptionError)
             }
         }

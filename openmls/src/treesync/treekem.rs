@@ -435,7 +435,10 @@ impl UpdatePathIn {
         crypto: &impl OpenMlsCrypto,
         tree_position: TreePosition,
     ) -> Result<UpdatePath, UpdatePathError> {
-        let leaf_node_in = self.leaf_node().clone();
+        let Self {
+            leaf_node: leaf_node_in,
+            nodes,
+        } = self;
         let verifiable_leaf_node = leaf_node_in.into_verifiable_leaf_node();
 
         // [valn1207](https://validation.openmls.tech/#valn1207)
@@ -449,10 +452,7 @@ impl UpdatePathIn {
                 commit_leaf_node.add_tree_position(tree_position);
 
                 let leaf_node: LeafNode = commit_leaf_node.verify(crypto, pk)?;
-                Ok(UpdatePath {
-                    leaf_node,
-                    nodes: self.nodes,
-                })
+                Ok(UpdatePath { leaf_node, nodes })
             }
             VerifiableLeafNode::Update(_) | VerifiableLeafNode::KeyPackage(_) => {
                 Err(UpdatePathError::InvalidType)
