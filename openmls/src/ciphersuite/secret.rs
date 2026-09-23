@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 
+use openmls_traits::types::HashType;
 use tls_codec::SecretVLBytes;
 
 use super::{kdf_label::KdfLabel, *};
@@ -41,6 +42,8 @@ impl PartialEq for Secret {
     }
 }
 
+const ZERO_IKF: [u8; HashType::MAX_SIZE] = [0; HashType::MAX_SIZE];
+
 impl Secret {
     /// Randomly sample a fresh `Secret`.
     /// This default random initialiser uses the default Secret length of `hash_length`.
@@ -80,17 +83,16 @@ impl Secret {
     ) -> Result<Self, CryptoError> {
         log::trace!("HKDF extract with");
         log_crypto!(trace, "  salt: {:x?}", self.value);
-        let zero_secret = Self::zero(ciphersuite);
-        let ikm = ikm_option.into().unwrap_or(&zero_secret);
-        log_crypto!(trace, "  ikm:  {:x?}", ikm.value);
+        let ikm: &[u8] = match ikm_option.into() {
+            Some(ikm) => ikm.value.as_slice(),
+            None => &ZERO_IKF[0..ciphersuite.hash_length()],
+        };
 
-        Ok(Self {
-            value: crypto.hkdf_extract(
-                ciphersuite.hash_algorithm(),
-                self.value.as_slice(),
-                ikm.value.as_slice(),
-            )?,
-        })
+        log_crypto!(trace, "  ikm:  {:x?}", ikm);
+
+        let value =
+            crypto.hkdf_extract(ciphersuite.hash_algorithm(), self.value.as_slice(), ikm)?;
+        Ok(Self { value })
     }
 
     pub(crate) fn hmac<'a>(

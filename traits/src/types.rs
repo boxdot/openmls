@@ -62,6 +62,11 @@ pub enum HashType {
 }
 
 impl HashType {
+    /// The largest output size of any [`HashType`], in bytes.
+    ///
+    /// Useful for stack buffers that must hold a hash output of any type.
+    pub const MAX_SIZE: usize = HashType::Sha2_512.size();
+
     /// Returns the output size of a hash by [`HashType`].
     #[inline]
     pub const fn size(&self) -> usize {
@@ -69,6 +74,18 @@ impl HashType {
             HashType::Sha2_256 => 32,
             HashType::Sha2_384 => 48,
             HashType::Sha2_512 => 64,
+        }
+    }
+}
+
+#[cfg(test)]
+mod hash_type_tests {
+    use super::HashType;
+
+    #[test]
+    fn max_size_covers_every_hash_type() {
+        for hash in [HashType::Sha2_256, HashType::Sha2_384, HashType::Sha2_512] {
+            assert!(hash.size() <= HashType::MAX_SIZE);
         }
     }
 }
